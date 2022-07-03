@@ -33,7 +33,7 @@ Requires preprocessing -
 ## esc50
 Fs=22.05KHz
 seq_len = 114688 ~5sec
-python trainer.py --max_lr 3e-4 --run_name r1 --emb_dim 128  --dataset esc50 --seq_len 114688  --mix_ratio 1 --epoch_mix 2 --mix_loss bce --batch_size 128 --n_epochs 3500 --ds_factors 4 4 4 4 --amp --save_path outputs
+python trainer.py --max_lr 3e-4 --run_name r1 --emb_dim 128  --dataset esc50 --seq_len 114688  --mix_ratio 1 --epoch_mix 12 --mix_loss bce --batch_size 128 --n_epochs 3500 --ds_factors 4 4 4 4 --amp --save_path outputs
 
 ## audioset
 Fs=22.05KHz
@@ -45,6 +45,8 @@ Fs=22.05KHz
 seq_len = 90112 ~4sec
 
 # inference
+python inference.py --f_res outputs/r1
 
+---------------------------------------------------
 # Third party -
 resample is mainly taken from - https://github.com/danpovey/filtering/blob/master/lilfilter/resampler.py
