@@ -49,4 +49,4 @@ python inference.py --f_res outputs/r1
 
 ---------------------------------------------------
 # Third party -
-resample is mainly taken from - https://github.com/danpovey/filtering/blob/master/lilfilter/resampler.py
+utils/resample.py is mainly taken from - https://github.com/danpovey/filtering/blob/master/lilfilter/resampler.py
