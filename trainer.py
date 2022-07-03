@@ -14,7 +14,7 @@ from datasets.batch_augs import BatchAugs
 def parse_args():
     parser = argparse.ArgumentParser()
     '''train'''
-    parser.add_argument("--max_lr", default=1e-3, type=float)
+    parser.add_argument("--max_lr", default=3e-4, type=float)
     parser.add_argument("--wd", default=1e-5, type=float)
     parser.add_argument("--batch_size", default=128, type=int)
     parser.add_argument("--run_name", default=None, type=Path)
@@ -554,7 +554,7 @@ def train(args):
                 y = torch.stack(y, dim=0).contiguous().to(device)
             else:
                 y = y.to(device)
-            x, targets, is_mixed = batch_augs(x, y, best_acc)
+            x, targets, is_mixed = batch_augs(x, y, epoch)
             with torch.cuda.amp.autocast(enabled=scaler is not None):
                 pred = net(x)
                 if is_mixed:
