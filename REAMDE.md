@@ -1,3 +1,37 @@
+link to paper:
+https://arxiv.org/abs/2204.11479
+
+please cite:
+@article{gazneli2022end,
+  title={End-to-End Audio Strikes Back: Boosting Augmentations Towards An Efficient Audio Classification Network},
+  author={Gazneli, Avi and Zimerman, Gadi and Ridnik, Tal and Sharir, Gilad and Noy, Asaf},
+  journal={arXiv preprint arXiv:2204.11479},
+  year={2022}
+}
+
+This work is done as sound classification task in Alibaba Israel
+
+---------------------------------------------------
+# Third party -
+utils/resample.py is mainly taken from - https://github.com/danpovey/filtering/blob/master/lilfilter/resampler.py
+
+---------------------------------------------
+
+# Network configuration
+## EAT-S
+emb_dim 128
+nf 16
+dim_feedforward 512
+n_layers 4
+n_head 8
+
+## EAT-M
+emb_dim 256
+nf 32
+dim_feedforward 2048
+n_layers 6
+n_head 16
+---------------------------------------------
 # Supported datasets -
 ESC-50
 Audioset
@@ -38,15 +72,19 @@ python trainer.py --max_lr 3e-4 --run_name r1 --emb_dim 128  --dataset esc50 --s
 ## audioset
 Fs=22.05KHz
 seq_len = 221184 ~10sec
+EAT-M - (for EAT-S modify the network parameters)
 python trainer.py --max_lr 3e-4 --run_name r1 --dataset audioset --seq_len 221184 --mix_ratio 1 --epoch_mix 2 --mix_loss bce --batch_size 208 --n_epochs 250 --scheduler onecycle --ds_factors 4 4 4 4 --save_path outputs --num_workers 32 --use_balanced_sampler --multilabel --amp --data_subtype full --use_dp --loss_type bce --augs_noise none --emb_dim 256 --nf 32 --dim_feedforward 2048 --n_layers 6 --n_head 16
 
 ## urban8k
 Fs=22.05KHz
 seq_len = 90112 ~4sec
+python trainer.py --max_lr 3e-4 --run_name r1 --emb_dim 128  --dataset urban8k --seq_len 90112  --mix_ratio 1 --epoch_mix 12 --mix_loss bce --batch_size 128 --n_epochs 3500 --ds_factors 4 4 4 4 --amp --save_path outputs
+
+speechcommands
+Fs=16KHz
+seq_len = 16384 ~1sec
+use use_bg in case one want to add background noise given in speechcommands dataset
+python trainer.py --max_lr 3e-4 --run_name r1 --emb_dim 128  --dataset esc50 --seq_len 16384  --mix_ratio 1 --epoch_mix 12 --mix_loss bce --batch_size 128 --n_epochs 1500 --ds_factors 4 4 4 --amp --save_path outputs
 
 # inference
 python inference.py --f_res outputs/r1
-
----------------------------------------------------
-# Third party -
-utils/resample.py is mainly taken from - https://github.com/danpovey/filtering/blob/master/lilfilter/resampler.py
