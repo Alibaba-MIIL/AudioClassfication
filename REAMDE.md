@@ -18,14 +18,14 @@ utils/resample.py is mainly taken from - https://github.com/danpovey/filtering/b
 ---------------------------------------------
 
 # Network configuration
-## EAT-S
+EAT-S -
 emb_dim 128
 nf 16
 dim_feedforward 512
 n_layers 4
 n_head 8
 
-## EAT-M
+EAT-M -
 emb_dim 256
 nf 32
 dim_feedforward 2048
