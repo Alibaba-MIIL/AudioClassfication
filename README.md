@@ -1,20 +1,20 @@
-link to paper:
+# Audio classification - 
+This work is done as sound classification task in Alibaba Israel
+
+# Link to paper
 https://arxiv.org/abs/2204.11479
 
-please cite:
+please cite - 
 @article{gazneli2022end,
   title={End-to-End Audio Strikes Back: Boosting Augmentations Towards An Efficient Audio Classification Network},
   author={Gazneli, Avi and Zimerman, Gadi and Ridnik, Tal and Sharir, Gilad and Noy, Asaf},
   journal={arXiv preprint arXiv:2204.11479},
   year={2022}
 }
-
-This work is done as sound classification task in Alibaba Israel
-
 ---------------------------------------------------
+
 # Third party -
 utils/resample.py is mainly taken from - https://github.com/danpovey/filtering/blob/master/lilfilter/resampler.py
-
 ---------------------------------------------
 
 # Network configuration
