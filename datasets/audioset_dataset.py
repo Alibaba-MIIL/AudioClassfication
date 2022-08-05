@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 import numpy as np
-import librosa
+import torchaudio
 import os
 import random
 from datasets.audio_augs import AudioAugs
@@ -95,7 +95,7 @@ class AudioSetDataset(torch.utils.data.Dataset):
                     self.samples_weight[i] = weights[y].sum()
                 torch.save(self.samples_weight, root + '/class_samples_' + data_subtype + '.pt')
 
-        self.transforms = AudioAugs(transforms, sampling_rate, p=0.5) if transforms is not None else None
+        self.transforms = transforms
 
     def _get_labels(self, root):
         f_labels = root + '/metadata/class_labels_indices.csv'
@@ -117,9 +117,9 @@ class AudioSetDataset(torch.utils.data.Dataset):
         data = self.meta[index]
         fname = self.root + '/' + data[0] + self.filetype
         labels = data[-1]
-        audio, sampling_rate = librosa.core.load(fname, sr=None, mono=True)
-        audio = 0.95 * librosa.util.normalize(audio)
-        audio = torch.from_numpy(audio).float()
+        audio, sampling_rate = torchaudio.load(fname)
+        audio.squeeze_()
+        audio = 0.95 * (audio / audio.__abs__().max()).float()
         if audio.shape[0] >= self.segment_length:
             max_audio_start = audio.size(0) - self.segment_length
             audio_start = random.randint(0, max_audio_start)
@@ -130,7 +130,7 @@ class AudioSetDataset(torch.utils.data.Dataset):
             ).data
 
         if self.transforms is not None:
-            audio = self.transforms(audio)
+            audio = AudioAugs(self.transforms, sampling_rate, p=0.5)(audio)
         return audio.unsqueeze(0), labels
 
     def __len__(self):
