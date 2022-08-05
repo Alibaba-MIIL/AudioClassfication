@@ -1,6 +1,6 @@
 import torch
+import torchaudio
 import torch.nn.functional as F
-import librosa
 import os
 import random
 from datasets.audio_augs import AudioAugs
@@ -27,7 +27,7 @@ class Urban8KDataset(torch.utils.data.Dataset):
         else:
             self.meta = meta[meta.loc[:, 'fold'] == fold_id]
         self.label2idx = dict(zip(self.labels, range(len(self.labels))))
-        self.transforms = AudioAugs(transforms, sampling_rate, p=0.5) if transforms is not None else None
+        self.transforms = transforms
 
     def _get_labels(self):
         self.labels = [
@@ -46,9 +46,10 @@ class Urban8KDataset(torch.utils.data.Dataset):
         meta_i = self.meta.iloc[index]
         fname = os.path.join(self.root, 'audio22_5', 'fold'+str(meta_i['fold']), meta_i['slice_file_name'])
         label = meta_i['classID']
-        audio, sampling_rate = librosa.core.load(fname, sr=None, mono=True)
-        audio = 0.95*librosa.util.normalize(audio)
-        audio = torch.from_numpy(audio).float()
+        # audio, sampling_rate = librosa.core.load(fname, sr=None, mono=True)
+        audio, sampling_rate = torchaudio.load(fname)
+        audio.squeeze_()
+        audio = 0.95 * (audio / audio.__abs__().max()).float()
 
         assert("sampling rate of the file is not as configured in dataset, will cause slow fetch {}".format(sampling_rate != self.sampling_rate))
         if audio.shape[0] >= self.segment_length:
@@ -61,7 +62,7 @@ class Urban8KDataset(torch.utils.data.Dataset):
             ).data
 
         if self.transforms is not None:
-            audio = self.transforms(audio)
+            audio = AudioAugs(self.transforms, sampling_rate, p=0.5)(audio)
 
         return audio.unsqueeze(0), label
 
