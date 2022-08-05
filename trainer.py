@@ -48,7 +48,7 @@ def parse_args():
     parser.add_argument("--use_ddp", action='store_true')
     parser.add_argument("--use_dp", action='store_true')
     parser.add_argument('--save_interval', default=100, type=int)
-    parser.add_argument('--num_workers', default=0, type=int)
+    parser.add_argument('--num_workers', default=8, type=int)
 
     '''data'''
     parser.add_argument('--fold_id', default=None, type=int)
