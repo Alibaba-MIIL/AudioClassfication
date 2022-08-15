@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-import librosa
+import torchaudio
 import os
 import glob
 import random
@@ -28,7 +28,7 @@ class ESCDataset(torch.utils.data.Dataset):
             raise ValueError("wrong mode")
         self.audio_files = sorted(fnames)
         self.label2idx = dict(zip(self.labels, range(len(self.labels))))
-        self.transforms = AudioAugs(transforms, sampling_rate, p=0.5) if transforms is not None else None
+        self.transforms = transforms
 
     def _get_labels(self, f_names):
         self.labels = sorted(list(set([f.split('/')[-2] for f in f_names])))
@@ -37,9 +37,9 @@ class ESCDataset(torch.utils.data.Dataset):
         fname = self.audio_files[index]
         label = fname.split('/')[-2]
         label = self.label2idx[label]
-        audio, sampling_rate = librosa.core.load(fname, sr=None, mono=True)
-        audio = 0.95*librosa.util.normalize(audio)
-        audio = torch.from_numpy(audio).float()
+        audio, sampling_rate = torchaudio.load(fname)
+        audio.squeeze_()
+        audio = 0.95 * (audio / audio.__abs__().max()).float()
 
         assert("sampling rate of the file is not as configured in dataset, will cause slow fetch {}".format(sampling_rate != self.sampling_rate))
         if audio.shape[0] >= self.segment_length:
@@ -52,7 +52,7 @@ class ESCDataset(torch.utils.data.Dataset):
             ).data
 
         if self.transforms is not None:
-            audio = self.transforms(audio)
+            audio = AudioAugs(self.transforms, sampling_rate, p=0.5)(audio)
 
         return audio.unsqueeze(0), label
 
