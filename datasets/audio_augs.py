@@ -471,7 +471,7 @@ class AudioAugs():
         self.augs_noise = [a for a in augs if a in self.noise_vec]
 
     def __call__(self, sample, **kwargs):
-        augs = self.augs_signal
+        augs = self.augs_signal.copy()
         augs_noise = self.augs_noise
         random.shuffle(augs)
         if len(augs_noise) > 0:
