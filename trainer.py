@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from utils.helper_funcs import accuracy, mAP
 from datasets.batch_augs import BatchAugs
+import logger
 
 
 def parse_args():
@@ -34,7 +35,7 @@ def parse_args():
                         default=['awgn', 'abgn', 'apgn', 'argn', 'avgn', 'aun', 'phn', 'sine'])
     parser.add_argument('--augs_mix', nargs='+', type=str, default=['mixup', 'timemix', 'freqmix', 'phmix'])
     parser.add_argument('--mix_loss', default='bce', type=str)
-    parser.add_argument('--mix_ratio', default=0.5, type=float)
+    parser.add_argument('--mix_ratio', default=1, type=float)
     parser.add_argument('--ema', default=0.995, type=float)
     parser.add_argument('--log_interval', default=100, type=int)
     parser.add_argument("--kd_model", default=None, type=Path)
@@ -51,10 +52,10 @@ def parse_args():
     parser.add_argument('--num_workers', default=8, type=int)
 
     '''data'''
-    parser.add_argument('--fold_id', default=None, type=int)
+    parser.add_argument('--fold_id', default=1, type=int)
     parser.add_argument("--data_subtype", default='balanced', type=str)
-    parser.add_argument('--seq_len', default=None, type=int)
-    parser.add_argument('--dataset', default=None, type=str)
+    parser.add_argument('--seq_len', default=90112, type=int)
+    parser.add_argument('--dataset', default="urban8k", type=str)
     '''net'''
     parser.add_argument('--ds_factors', nargs='+', type=int, default=[4, 4, 4, 4])
     parser.add_argument('--n_head', default=8, type=int)
@@ -203,41 +204,20 @@ def create_model(args):
     return net
 
 
-def save_model(net, opt, loss, best_loss, acc, best_acc, steps, root, lr_scheduler=None, scaler=None):
-    if acc > best_acc:
-        best_acc = acc
-        best_loss = loss
-        chkpnt = {
-            'best_acc': best_acc,
-            'model_dict': net.state_dict(),
-            'opt_dict': opt.state_dict(),
-            'steps': steps,
-            'best_loss': best_loss,
-        }
-        if lr_scheduler is not None:
-            chkpnt['lr_scheduler'] = lr_scheduler.state_dict()
-        if scaler is not None:
-            chkpnt['scaler'] = scaler.state_dict()
-        torch.save(chkpnt, root / "chkpnt.pt")
-        torch.save(net.state_dict(), root / "best_model.pt")
-        print(best_acc, 'saved')
-
-    elif acc == best_acc:
-        if loss < best_loss:
-            best_loss = loss
-            chkpnt = {
-                'best_acc': best_acc,
-                'model_dict': net.state_dict(),
-                'opt_dict': opt.state_dict(),
-                'steps': steps,
-                'best_loss': best_loss,
-            }
-            if lr_scheduler is not None:
-                chkpnt['lr_scheduler'] = lr_scheduler.state_dict()
-            torch.save(chkpnt, root / "chkpnt.pt")
-            torch.save(net.state_dict(), root / "best_model.pt")
-            print(best_acc, 'saved')
-    return best_acc, best_loss
+def save_model(net, opt, loss, acc, steps, root, lr_scheduler=None, scaler=None):    
+    chkpnt = {            
+        'model_dict': net.state_dict(),
+        'opt_dict': opt.state_dict(),
+        'steps': steps,            
+    }
+    if lr_scheduler is not None:
+        chkpnt['lr_scheduler'] = lr_scheduler.state_dict()
+    if scaler is not None:
+        chkpnt['scaler'] = scaler.state_dict()
+    torch.save(chkpnt, root / "chkpnt.pt")
+    torch.save(net.state_dict(), root / "best_model.pt")
+    print(acc, loss, 'saved')
+    return True    
 
 
 def train(args):
@@ -254,7 +234,7 @@ def train(args):
         args.sampling_rate = 16000
         args.n_classes = 35
     elif args.dataset == 'urban8k':
-        args.data_path = r'../data/UrbanSound8K'
+        args.data_path = r'../../datasets/UrbanSound8K'
         args.sampling_rate = 22050
         args.n_classes = 10
     else:
@@ -340,7 +320,7 @@ def train(args):
     net.to(device)
     ####################################
     # ext pretrainining           #
-    #############pretrained#######################
+    ####################################
     if args.ext_pretrained is not None:
         pre = ''
         print("loading model for pretraining ", (Path(pre + args.ext_pretrained) / Path("model.pt")).is_file())
@@ -488,9 +468,7 @@ def train(args):
 
     #####################
     # resume training   #
-    #####################
-    best_acc = -1
-    best_loss = 999
+    #####################    
     steps = 0
     if load_root and load_root.exists():
         chkpnt = torch.load(load_root / "chkpnt.pt")
@@ -511,31 +489,25 @@ def train(args):
                 scaler.load_state_dict(chkpnt["scaler"])
             if lr_scheduler is chkpnt.keys() and chkpnt['lr_scheduler'] is not None:
                 lr_scheduler.load_state_dict(chkpnt['lr_scheduler'])
-            steps = chkpnt['steps'] if 'steps' in chkpnt.keys() else 0
-
-        best_acc = chkpnt['best_acc']
-        if 'best_loss' in chkpnt.keys():
-            best_loss = chkpnt['best_loss']
+            steps = chkpnt['steps'] if 'steps' in chkpnt.keys() else 0        
 
         print('checkpoints loaded')
-    else:
-        best_acc = -1
-        best_loss = 999
-        steps = 0
-    print(best_acc)
+    else:                
+        steps = 0        
 
     # enable cudnn autotuner to speed up training
     torch.backends.cudnn.benchmark = True
 
     dummy_run(net, args.batch_size, args.seq_len)
-    costs = []
-    net.train()
-    start = time.time()
+    net.train()    
     skip_scheduler = False
     for epoch in range(1, args.n_epochs + 1):
         if args.use_ddp:
-            sampler.set_epoch(epoch)
-        t_epoch = time.time()
+            sampler.set_epoch(epoch)        
+
+        metric_logger = logger.MetricLogger(delimiter="  ")
+        metric_logger.add_meter("lr", logger.SmoothedValue(window_size=1, fmt="{value:.6f}"))
+        header = f"Epoch: [{epoch}]"
 
         if epochs_from_last_reset <= 1:  # two first epochs do ultra short-term ema
             ema.decay_per_epoch = 0.01
@@ -546,7 +518,7 @@ def train(args):
         # set 'decay_per_step' for the eooch
         ema.set_decay_per_step(len(train_loader))
 
-        for iterno, (x, y) in enumerate(train_loader):
+        for iterno, (x, y) in  enumerate(metric_logger.log_every(train_loader, args.log_interval, header)):
             t_batch = time.time()
             x = x.to(device)
             if args.multilabel:
@@ -599,33 +571,25 @@ def train(args):
                 acc = acc.item()
             else:
                 acc = mAP(y.detach().cpu().numpy(), torch.sigmoid(pred).detach().cpu().numpy())
-            costs.append([acc, loss_cls.item(), opt.param_groups[0]['lr']])
+            
+            metric_logger.update(acc=acc)
+            metric_logger.update(loss=loss_cls.item())            
+            metric_logger.update(lr=opt.param_groups[0]["lr"])
+
             ######################
             # Update tensorboard #
             ######################
             if steps % args.log_interval == 0:
                 if not args.use_ddp or (args.use_ddp and torch.distributed.get_rank() == 0):
-                    writer.add_scalar("train/acc", costs[-1][0], steps)
-                    writer.add_scalar("train/ce", costs[-1][1], steps)
-                    writer.add_scalar("train/lr", costs[-1][2], steps)
-
-                t_batch = time.time() - t_batch
-                print("epoch {}/{} | iters {}/{} | ms/batch {:5.2f} | acc/loss {}".format(
-                    epoch,
-                    args.n_epochs,
-                    iterno,
-                    len(train_loader),
-                    1000 * t_batch / args.log_interval,
-                    np.asarray(costs).mean(0))
-                )
-                costs = []
-                start = time.time()
+                    writer.add_scalar("train/acc", acc, steps)
+                    writer.add_scalar("train/ce", loss_cls, steps)
+                    writer.add_scalar("train/lr", lr_scheduler.get_last_lr()[0], steps)
 
             steps += 1
+            
             if steps % args.save_interval == 0:
                 ''' validate'''
-                net.eval()
-                st = time.time()
+                net.eval()                
                 loss = 0
                 if args.multilabel:
                     labels = np.zeros((len(test_loader.dataset), args.n_classes)).astype(np.float32)
@@ -642,7 +606,7 @@ def train(args):
                             y = torch.stack(y, dim=0).contiguous().to(device)
                             y = y.to(device)
                             pred = net(x)
-                            loss += F.binary_cross_entropy_with_logits(pred, y)
+                            loss += F.binary_cross_entropy_with_logits(pred, y).item()
                             idx_end = idx_start + y.shape[0]
                             preds[idx_start:idx_end, :] = torch.sigmoid(pred).detach().data.cpu().numpy()
                             labels[idx_start:idx_end, :] = y.detach().data.cpu().numpy()
@@ -651,7 +615,7 @@ def train(args):
                             y = y.to(device)
                             pred = net(x)
                             _, y_est = torch.max(pred, 1)
-                            loss += F.cross_entropy(pred, y)
+                            loss += F.cross_entropy(pred, y).item()
                             acc += accuracy(pred.detach().data, y.detach().data, topk=[1, ])[0].item()
                             for t, p in zip(y.view(-1), y_est.view(-1)):
                                 cm[t.long(), p.long()] += 1
@@ -659,34 +623,18 @@ def train(args):
 
                     if args.multilabel:
                         acc = mAP(labels, preds)
-                    else:
-                        # acc /= len(test_loader)
+                    else:                        
                         acc = 100*np.diag(cm).sum()/ len(test_loader.dataset)
 
+                metric_logger.update(loss_test=loss)
+                metric_logger.update(acc_test=acc)
+                
                 writer.add_scalar("test/acc", acc, steps)
-                writer.add_scalar("test/ce", loss.item(), steps)
+                writer.add_scalar("test/ce", loss, steps)
 
-                best_acc, best_loss = save_model(net, opt, loss, best_loss, acc, best_acc, steps, root, lr_scheduler=lr_scheduler, scaler=scaler)
-
-                print(
-                    "test: Epoch {} | Iters {} / {} | ms/batch {:5.2f} | acc/best acc/loss {:.2f} {:.2f} {:.2f} {:.2f}".format(
-                        epoch,
-                        iterno,
-                        len(test_loader),
-                        1000 * (time.time() - start) / args.log_interval,
-                        acc,
-                        best_acc,
-                        loss,
-                        best_loss,
-                    )
-                )
-
-                print("Took %5.4fs to save samples" % (time.time() - st))
-                print("-" * 100)
+                save_model(net, opt, loss, acc, steps, root, lr_scheduler=lr_scheduler, scaler=scaler)
+                
                 net.train()
-
-        t_epoch = time.time() - t_epoch
-        print("epoch {}/{} time {:.2f}".format(epoch, args.n_epochs, t_epoch / args.log_interval))
 
 
 def main():
